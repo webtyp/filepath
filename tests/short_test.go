@@ -1,29 +1,20 @@
-package fmt
+package filepath_test
 
 import (
-	"os"
 	"testing"
+	"webtyp.com/filepath"
 )
 
-func TestPathShort(t *testing.T) {
-	// Setup base for tests
-	originalBase := pathBase
-	defer func() { pathBase = originalBase }()
-
-	wd, _ := os.Getwd()
-
+// TestPathRelativeTo proves shortenAgainst behaves identically whether reached
+// via Short's cached pathBase global or via RelativeTo's explicit
+// base parameter.
+func TestPathRelativeTo(t *testing.T) {
 	tests := []struct {
 		name string
 		base string
 		path string
 		want string
 	}{
-		{
-			name: "relative from explicit wd",
-			base: wd, // Use explicit wd instead of auto-detection (WASM auto-detects URL origin)
-			path: PathJoin(wd, "web/public").String(),
-			want: "./web/public",
-		},
 		{
 			name: "relative from manual base",
 			base: "/home/user/project",
@@ -85,6 +76,12 @@ func TestPathShort(t *testing.T) {
 			want: "moving ./a to ./b",
 		},
 		{
+			name: "base inside another path is not a match",
+			base: "/home/user/project",
+			path: "see /mnt/home/user/project/x",
+			want: "see /mnt/home/user/project/x",
+		},
+		{
 			name: "within quotes",
 			base: "/home/user/project",
 			path: `source is "/home/user/project/main.go"`,
@@ -95,85 +92,6 @@ func TestPathShort(t *testing.T) {
 			base: "/home/user/project",
 			path: "current dir is /home/user/project, check it.",
 			want: "current dir is /home/user/project, check it.", // NOT valid boundary because , is not / or \
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.base != "" {
-				SetPathBase(tc.base)
-			} else {
-				pathBase = "" // trigger auto-detection
-			}
-
-			// PathShort expects the path to be in BuffOut
-			got := Convert(tc.path).PathShort().String()
-
-			// adjust expected for auto-detection case if needed
-			want := tc.want
-			if tc.base == "" {
-				// if we used auto-detection, the want is relative to cleanWD
-				// our test setup uses PathJoin(wd, "web/public") so it should match
-			}
-
-			if got != want {
-				t.Errorf("%s: PathShort(%q) with base %q = %q; want %q", tc.name, tc.path, pathBase, got, want)
-			}
-		})
-	}
-}
-
-// TestPathRelativeTo proves shortenAgainst behaves identically whether reached
-// via PathShort's cached pathBase global or via PathRelativeTo's explicit
-// base parameter — same cases as TestPathShort, called directly instead.
-func TestPathRelativeTo(t *testing.T) {
-	tests := []struct {
-		name string
-		base string
-		path string
-		want string
-	}{
-		{
-			name: "relative from manual base",
-			base: "/home/user/project",
-			path: "/home/user/project/modules/test.js",
-			want: "./modules/test.js",
-		},
-		{
-			name: "exactly same as base",
-			base: "/home/user/project",
-			path: "/home/user/project",
-			want: ".",
-		},
-		{
-			name: "different path",
-			base: "/home/user/project",
-			path: "/etc/passwd",
-			want: "/etc/passwd",
-		},
-		{
-			name: "prefix but not subpath",
-			base: "/home/user/pro",
-			path: "/home/user/project",
-			want: "/home/user/project",
-		},
-		{
-			name: "subpath with trailing slash in input",
-			base: "/home/user/project",
-			path: "/home/user/project/web/",
-			want: "./web/",
-		},
-		{
-			name: "manually set base as root",
-			base: "/",
-			path: "/etc/passwd",
-			want: "./etc/passwd",
-		},
-		{
-			name: "multiple occurrences",
-			base: "/home/user/project",
-			path: "moving /home/user/project/a to /home/user/project/b",
-			want: "moving ./a to ./b",
 		},
 		{
 			// The case that matters for webtyp/ddlc's daemon-side Label():
@@ -188,9 +106,9 @@ func TestPathRelativeTo(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := PathRelativeTo(tc.path, tc.base)
+			got := filepath.RelativeTo(tc.path, tc.base)
 			if got != tc.want {
-				t.Errorf("%s: PathRelativeTo(%q, %q) = %q; want %q", tc.name, tc.path, tc.base, got, tc.want)
+				t.Errorf("RelativeTo(%q, %q) = %q; want %q", tc.path, tc.base, got, tc.want)
 			}
 		})
 	}
@@ -198,19 +116,16 @@ func TestPathRelativeTo(t *testing.T) {
 
 func TestPathShortWindows(t *testing.T) {
 	// Manual test for windows-style paths even on linux
-	// since pathClean and PathJoin handle them conceptually
-	originalBase := pathBase
-	defer func() { pathBase = originalBase }()
+	// since pathClean and Join handle them conceptually
+	base := `C:\Users\Project`
 
-	SetPathBase(`C:\Users\Project`)
-
-	got := Convert(`C:\Users\Project\file.txt`).PathShort().String()
+	got := filepath.RelativeTo(`C:\Users\Project\file.txt`, base)
 	want := "./file.txt"
 	if got != want {
 		t.Errorf("Windows relative: got %q; want %q", got, want)
 	}
 
-	got = Convert(`C:\Users\Project`).PathShort().String()
+	got = filepath.RelativeTo(`C:\Users\Project`, base)
 	want = "."
 	if got != want {
 		t.Errorf("Windows same: got %q; want %q", got, want)

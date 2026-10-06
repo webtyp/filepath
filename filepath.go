@@ -1,64 +1,64 @@
-package fmt
+package filepath
 
-// PathJoin joins path elements using the appropriate separator.
-// Accepts variadic string arguments and returns a Conv instance for method chaining.
+import (
+	"webtyp.com/fmt"
+)
+
+// Join joins path elements using the appropriate separator.
+// Accepts variadic string arguments and returns a string.
 // Detects Windows paths (backslash) or Unix paths (forward slash).
 // Empty elements are ignored.
 //
 // Usage patterns:
-//   - PathJoin("a", "b", "c").String()           // -> "a/b/c"
-//   - PathJoin("a", "B", "c").ToLower().String() // -> "a/b/c"
+//   - Join("a", "b", "c")           // -> "a/b/c"
 //
 // Examples:
 //
-//	PathJoin("a", "b", "c").String()           // -> "a/b/c"
-//	PathJoin("/root", "sub", "file").String()   // -> "/root/sub/file"
-//	PathJoin(`C:\dir`, "file").String()        // -> "C:\dir\file"
-//	PathJoin("a", "", "b").String()            // -> "a/b"
-//	PathJoin("a", "B", "c").ToLower().String() // -> "a/b/c"
-func PathJoin(elem ...string) *Conv {
-	c := GetConv()
-
+//	Join("a", "b", "c")           // -> "a/b/c"
+//	Join("/root", "sub", "file")   // -> "/root/sub/file"
+//	Join(`C:\dir`, "file")        // -> "C:\dir\file"
+//	Join("a", "", "b")            // -> "a/b"
+func Join(elem ...string) string {
 	if len(elem) == 0 {
-		return c
+		return ""
 	}
 
 	sep := "/"
 	// detect separator from first element with a separator
 	for _, e := range elem {
-		if Index(e, "\\") != -1 {
+		if fmt.Index(e, "\\") != -1 {
 			sep = "\\"
 			break
 		}
 	}
+
+	var buf []byte
 
 	for i, e := range elem {
 		if e == "" {
 			continue
 		}
 
-		curr := c.GetString(BuffOut)
-
 		// trim leading separators only if not the first element
-		if i > 0 && len(curr) > 0 {
+		if i > 0 && len(buf) > 0 {
 			for len(e) > 0 && (e[0] == '/' || e[0] == '\\') {
 				e = e[1:]
 			}
 		}
 
 		// add separator if needed
-		if len(curr) > 0 && !HasSuffix(curr, sep) && e != "" {
-			c.WrString(BuffOut, sep)
+		if len(buf) > 0 && !fmt.HasSuffix(string(buf), sep) && e != "" {
+			buf = append(buf, sep...)
 		}
-		c.WrString(BuffOut, e)
+		buf = append(buf, e...)
 	}
 
-	return c
+	return string(buf)
 }
 
 // pathClean normalizes a path by detecting the separator and handling special cases.
 // Returns the cleaned path and the detected separator.
-// This is a helper function used by PathBase and PathExt to avoid code duplication.
+// This is a helper function used by Base and Ext to avoid code duplication.
 func pathClean(path string) (string, byte) {
 	if path == "" {
 		return ".", '/'
@@ -66,7 +66,7 @@ func pathClean(path string) (string, byte) {
 
 	// prefer backslash if present
 	sep := byte('/')
-	if Index(path, "\\") != -1 {
+	if fmt.Index(path, "\\") != -1 {
 		sep = '\\'
 	}
 
@@ -102,7 +102,7 @@ func pathClean(path string) (string, byte) {
 func extractBase(cleaned string, sep byte, prefix string) string {
 	// If prefix is set, try to strip it
 	if prefix != "" {
-		if HasPrefix(cleaned, prefix) {
+		if fmt.HasPrefix(cleaned, prefix) {
 			rel := cleaned[len(prefix):]
 			// check if it's a full component match
 			isRoot := len(prefix) == 1 && (prefix[0] == '/' || prefix[0] == '\\')
@@ -132,79 +132,49 @@ func extractBase(cleaned string, sep byte, prefix string) string {
 	return cleaned
 }
 
-// PathBase returns the last element of path, similar to
+// Base returns the last element of path, similar to
 // filepath.Base from the Go standard library. It treats
 // trailing slashes specially ("/a/b/" -> "b") and preserves
 // a single root slash ("/" -> "/"). An empty path returns ".".
 //
-// The implementation uses tinystring helpers (HasSuffix and Index)
-// to avoid importing the standard library and keep the function
-// minimal and TinyGo-friendly.
-//
 // Examples:
 //
-//		PathBase("/a/b/c.txt") // -> "c.txt"
-//		PathBase("folder/file.txt")   // -> "file.txt"
-//		PathBase("")           // -> "."
-//	 PathBase("c:\file program\app.exe") // -> "app.exe"
-//
-// PathBase writes the last element of the path into the Conv output buffer.
-// Use it as: Convert(path).PathBase().String() and it behaves similarly to
-// filepath.Base. Examples:
-//
-// Convert("/a/b/c.txt").PathBase().String() // -> "c.txt"
-// Convert("folder/file.txt").PathBase().String()   // -> "file.txt"
-// Convert("").PathBase().String()           // -> "."
-// Convert(`c:\file program\app.exe`).PathBase().String() // -> "app.exe"
-func (c *Conv) PathBase() *Conv {
-	// read source path from buffer
-	src := c.GetString(BuffOut)
-
-	cleaned, sep := pathClean(src)
-
-	// clear output buffer - PathBase will write the resulting base
-	c.ResetBuffer(BuffOut)
+//		Base("/a/b/c.txt") // -> "c.txt"
+//		Base("folder/file.txt")   // -> "file.txt"
+//		Base("")           // -> "."
+//	 Base(`c:\file program\app.exe`) // -> "app.exe"
+func Base(path string) string {
+	cleaned, sep := pathClean(path)
 
 	base := extractBase(cleaned, sep, "")
 	if base == "" {
 		// Special case: write the cleaned value (., /, or \)
-		c.WrString(BuffOut, cleaned)
-	} else {
-		c.WrString(BuffOut, base)
+		return cleaned
 	}
-
-	return c
+	return base
 }
 
-// PathExt extracts the file extension from a path and writes it to the Conv buffer.
-// Returns the Conv instance for method chaining.
+// Ext extracts the file extension from a path.
 // An empty extension returns an empty string.
 //
 // Examples:
 //
-//	Convert("/a/b/c.txt").PathExt().String() // -> ".txt"
-//	Convert("file.tar.gz").PathExt().String() // -> ".gz"
-//	Convert("noext").PathExt().String()       // -> ""
-//	Convert("C:\\dir\\app.EXE").PathExt().ToLower().String() // -> ".exe"
-func (c *Conv) PathExt() *Conv {
-	// Read current path from output buffer
-	src := c.GetString(BuffOut)
-
-	cleaned, sep := pathClean(src)
-
-	// clear output buffer - PathExt returns only the extension
-	c.ResetBuffer(BuffOut)
+//	Ext("/a/b/c.txt") // -> ".txt"
+//	Ext("file.tar.gz") // -> ".gz"
+//	Ext("noext")       // -> ""
+func Ext(path string) string {
+	cleaned, sep := pathClean(path)
 
 	// get the base filename using helper
 	base := extractBase(cleaned, sep, "")
 	if base == "" {
 		// Special cases like ".", "/", "\\" have no extension
-		return c
+		return ""
 	}
 
 	// special cases: "." and ".." have no extension
 	if base == "." || base == ".." {
-		return c
+		return ""
 	}
 
 	// search for last dot in base filename
@@ -212,128 +182,120 @@ func (c *Conv) PathExt() *Conv {
 		if base[i] == '.' {
 			// don't count leading dot (hidden files like .bashrc)
 			if i == 0 {
-				return c
+				return ""
 			}
-			c.WrString(BuffOut, base[i:])
-			return c
+			return base[i:]
 		}
 	}
 
-	return c
+	return ""
 }
 
-// pathBase stores the base path for shortening operations.
-var pathBase string
-
-// SetPathBase sets the base path for PathShort operations.
-// Optional: if not called, PathShort auto-detects using GetPathBase (os.Getwd or syscall/js).
-func SetPathBase(base string) {
-	pathBase, _ = pathClean(base)
-}
-
-// PathShort shortens absolute paths relative to base path.
+// Short shortens absolute paths relative to root path.
 // It can handle paths embedded in larger strings (e.g. log messages).
-// Auto-detects base path via GetPathBase() if SetPathBase was not called.
+// Auto-detects root path on every call.
 // Returns relative path with "./" prefix for minimal output.
 // Example: "Compiling /home/user/project/src/file.go ..." -> "Compiling ./src/file.go ..."
-func (c *Conv) PathShort() *Conv {
-	if pathBase == "" {
-		pathBase = GetPathBase()
+func Short(text string) string {
+	root := detectRoot()
+	if root == "" {
+		return text
 	}
 
-	if pathBase == "" {
-		return c
-	}
-
-	return c.shortenAgainst(pathBase)
+	return RelativeTo(text, root)
 }
 
-// PathRelativeTo shortens path's occurrences of base into "./"-relative form,
-// using the same algorithm as PathShort but with the base given explicitly —
+// RelativeTo shortens text's occurrences of base into "./"-relative form,
+// using the same algorithm as Short but with the base given explicitly —
 // for callers that track their own reference directory instead of relying on
-// SetPathBase/GetPathBase's process-CWD auto-detection (e.g. a daemon whose
-// own working directory does not track the project root it is serving).
+// CWD auto-detection.
 //
-// Example: PathRelativeTo("/home/user/project/config/db.sql", "/home/user/project")
+// Example: RelativeTo("/home/user/project/config/db.sql", "/home/user/project")
 // -> "./config/db.sql"
-func PathRelativeTo(path, base string) string {
+func RelativeTo(text, base string) string {
 	cleanedBase, _ := pathClean(base)
 	if cleanedBase == "" {
-		return path
+		return text
 	}
 
-	c := GetConv()
-	c.WrString(BuffOut, path)
-	return c.shortenAgainst(cleanedBase).String()
+	return shortenAgainst(text, cleanedBase, ".")
 }
 
-// shortenAgainst is the shared algorithm behind PathShort and PathRelativeTo:
-// it rewrites occurrences of base in the Conv's current BuffOut into "./"-
-// relative form. base must already be cleaned (see pathClean).
-func (c *Conv) shortenAgainst(base string) *Conv {
-	src := c.GetStringZeroCopy(BuffOut)
-	if src == "" {
-		return c
+func isPathStart(prev byte) bool {
+	return prev == ' ' || prev == '\t' || prev == '\n' || prev == '\r' || prev == '"' || prev == '\'' || prev == '(' || prev == '`' || prev == '='
+}
+
+// Tilde writes every occurrence of the user's home directory in text as "~"
+// ("/home/dev/Project/app" -> "~/Project/app"), including paths embedded in log
+// lines, like Short. No-op when the home is unknown (always in WASM) or is "/".
+func Tilde(text string) string {
+	home := detectHome()
+	if home == "" || home == "/" || home == "\\" {
+		return text
+	}
+	return shortenAgainst(text, home, "~")
+}
+
+// shortenAgainst rewrites occurrences of base in text into replacement-relative form.
+// base must already be cleaned (see pathClean).
+func shortenAgainst(text, base, replacement string) string {
+	if text == "" {
+		return ""
 	}
 
-	// We'll build the result in the work buffer to avoid multiple allocations
-	c.ResetBuffer(BuffWork)
-
+	var buf []byte
 	start := 0
+
 	for {
-		idx := Index(src[start:], base)
+		idx := fmt.Index(text[start:], base)
 		if idx == -1 {
-			c.WrString(BuffWork, src[start:])
+			buf = append(buf, text[start:]...)
 			break
 		}
 
 		matchIdx := start + idx
-		c.WrString(BuffWork, src[start:matchIdx])
+		buf = append(buf, text[start:matchIdx]...)
 
 		// Validate match boundary
 		endIdx := matchIdx + len(base)
 		isRoot := len(base) == 1 && (base[0] == '/' || base[0] == '\\')
 
 		valid := false
-		if isRoot {
-			// Root is valid if it's the start of a component
-			if matchIdx == 0 {
+
+		if matchIdx == 0 || isPathStart(text[matchIdx-1]) {
+			if isRoot {
 				valid = true
-			} else {
-				prevChar := src[matchIdx-1]
-				if prevChar == ' ' || prevChar == '\t' || prevChar == '\n' || prevChar == '\r' || prevChar == '"' || prevChar == '\'' || prevChar == '(' {
-					valid = true
+				// Root followed by another separator is not a valid single root match (e.g. //)
+				if valid && endIdx < len(text) && (text[endIdx] == '/' || text[endIdx] == '\\') {
+					valid = false
 				}
-			}
-			// Root followed by another separator is not a valid single root match (e.g. //)
-			if valid && endIdx < len(src) && (src[endIdx] == '/' || src[endIdx] == '\\') {
-				valid = false
-			}
-		} else {
-			if endIdx == len(src) {
-				valid = true
 			} else {
-				nextChar := src[endIdx]
-				if nextChar == '/' || nextChar == '\\' {
+				if endIdx == len(text) {
 					valid = true
+				} else {
+					nextChar := text[endIdx]
+					if nextChar == '/' || nextChar == '\\' {
+						valid = true
+					}
 				}
 			}
 		}
 
 		if valid {
 			if isRoot {
-				if endIdx == len(src) {
-					c.WrString(BuffWork, ".")
+				if endIdx == len(text) {
+					buf = append(buf, replacement...)
 				} else {
-					c.WrString(BuffWork, "./")
+					buf = append(buf, replacement...)
+					buf = append(buf, '/')
 				}
 				start = endIdx
 			} else {
-				c.WrString(BuffWork, ".")
+				buf = append(buf, replacement...)
 
 				// If followed by a separator, consume it and write "/" to normalize
-				if endIdx < len(src) && (src[endIdx] == '/' || src[endIdx] == '\\') {
-					c.WrString(BuffWork, "/")
+				if endIdx < len(text) && (text[endIdx] == '/' || text[endIdx] == '\\') {
+					buf = append(buf, '/')
 					start = endIdx + 1
 				} else {
 					start = endIdx
@@ -341,13 +303,10 @@ func (c *Conv) shortenAgainst(base string) *Conv {
 			}
 		} else {
 			// Not a valid path boundary, just copy the match and continue
-			c.WrString(BuffWork, base)
+			buf = append(buf, base...)
 			start = endIdx
 		}
 	}
 
-	// Swap BuffWork to BuffOut
-	c.swapBuff(BuffWork, BuffOut)
-
-	return c
+	return string(buf)
 }

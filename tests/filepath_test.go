@@ -1,6 +1,10 @@
-package fmt
+package filepath_test
 
-import "testing"
+import (
+	"testing"
+	"webtyp.com/filepath"
+	"webtyp.com/fmt"
+)
 
 func TestJoin(t *testing.T) {
 	tests := []struct {
@@ -24,9 +28,9 @@ func TestJoin(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := PathJoin(tc.elem...).String()
+			got := filepath.Join(tc.elem...)
 			if got != tc.want {
-				t.Errorf("PathJoin(%v) = %q; want %q", tc.elem, got, tc.want)
+				t.Errorf("Join(%v) = %q; want %q", tc.elem, got, tc.want)
 			}
 		})
 	}
@@ -46,9 +50,9 @@ func TestJoinWindows(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := PathJoin(tc.elem...).String()
+			got := filepath.Join(tc.elem...)
 			if got != tc.want {
-				t.Errorf("PathJoin(%v) = %q; want %q", tc.elem, got, tc.want)
+				t.Errorf("Join(%v) = %q; want %q", tc.elem, got, tc.want)
 			}
 		})
 	}
@@ -83,9 +87,9 @@ func TestFilePathBase(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.path, func(t *testing.T) {
-			got := Convert(tc.path).PathBase().String()
+			got := filepath.Base(tc.path)
 			if got != tc.want {
-				t.Fatalf("FilePathBase(%q) = %q; want %q", tc.path, got, tc.want)
+				t.Fatalf("Base(%q) = %q; want %q", tc.path, got, tc.want)
 			}
 		})
 	}
@@ -102,9 +106,9 @@ func TestPathBaseWindows(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.path, func(t *testing.T) {
-			got := Convert(tc.path).PathBase().String()
+			got := filepath.Base(tc.path)
 			if got != tc.want {
-				t.Fatalf("PathBase(%q) = %q; want %q", tc.path, got, tc.want)
+				t.Fatalf("Base(%q) = %q; want %q", tc.path, got, tc.want)
 			}
 		})
 	}
@@ -134,9 +138,9 @@ func TestPathExt(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Convert(tc.path).PathExt().String()
+			got := filepath.Ext(tc.path)
 			if got != tc.want {
-				t.Errorf("PathExt(%q) = %q; want %q", tc.path, got, tc.want)
+				t.Errorf("Ext(%q) = %q; want %q", tc.path, got, tc.want)
 			}
 		})
 	}
@@ -158,9 +162,9 @@ func TestPathExtWindows(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Convert(tc.path).PathExt().String()
+			got := filepath.Ext(tc.path)
 			if got != tc.want {
-				t.Errorf("PathExt(%q) = %q; want %q", tc.path, got, tc.want)
+				t.Errorf("Ext(%q) = %q; want %q", tc.path, got, tc.want)
 			}
 		})
 	}
@@ -168,18 +172,18 @@ func TestPathExtWindows(t *testing.T) {
 
 func TestPathExtNormalizeCase(t *testing.T) {
 	// Typical uses: extension in uppercase normalized to lowercase in the same chain
-	got := Convert("file.TXT").PathExt().ToLower().String()
+	got := fmt.Convert(filepath.Ext("file.TXT")).ToLower().String()
 	if got != ".txt" {
 		t.Errorf("Normalize ext: got %q; want %q", got, ".txt")
 	}
 
-	got = Convert(`C:\DIR\APP.EXE`).PathExt().ToLower().String()
+	got = fmt.Convert(filepath.Ext(`C:\DIR\APP.EXE`)).ToLower().String()
 	if got != ".exe" {
 		t.Errorf("Normalize ext windows: got %q; want %q", got, ".exe")
 	}
 
 	// Already lowercase stays the same
-	got = Convert("archive.tar.Gz").PathExt().ToLower().String()
+	got = fmt.Convert(filepath.Ext("archive.tar.Gz")).ToLower().String()
 	if got != ".gz" {
 		t.Errorf("Normalize mixed case: got %q; want %q", got, ".gz")
 	}
@@ -187,18 +191,18 @@ func TestPathExtNormalizeCase(t *testing.T) {
 
 func TestPathJoinNormalizeCase(t *testing.T) {
 	// Typical use: path with mixed case normalized to lowercase
-	got := PathJoin("A", "B", "C").ToLower().String()
+	got := fmt.Convert(filepath.Join("A", "B", "C")).ToLower().String()
 	if got != "a/b/c" {
 		t.Errorf("Normalize path: got %q; want %q", got, "a/b/c")
 	}
 
-	got = PathJoin(`C:\Windows`, "System32", "DRIVERS").ToLower().String()
+	got = fmt.Convert(filepath.Join(`C:\Windows`, "System32", "DRIVERS")).ToLower().String()
 	if got != `c:\windows\system32\drivers` {
 		t.Errorf("Normalize windows path: got %q; want %q", got, `c:\windows\system32\drivers`)
 	}
 
 	// Mixed case elements
-	got = PathJoin("/VAR", "Log", "APP.log").ToLower().String()
+	got = fmt.Convert(filepath.Join("/VAR", "Log", "APP.log")).ToLower().String()
 	if got != "/var/log/app.log" {
 		t.Errorf("Normalize unix path: got %q; want %q", got, "/var/log/app.log")
 	}
