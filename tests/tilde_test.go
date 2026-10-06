@@ -3,16 +3,11 @@
 package filepath_test
 
 import (
-	"os"
 	"testing"
 	"webtyp.com/filepath"
 )
 
 func TestTilde(t *testing.T) {
-	// preserve original HOME
-	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-
 	t.Setenv("HOME", "/home/dev")
 
 	tests := []struct {
@@ -73,9 +68,6 @@ func TestTilde(t *testing.T) {
 }
 
 func TestTildeRootHome(t *testing.T) {
-	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-
 	t.Setenv("HOME", "/")
 
 	in := "/etc/hosts"
@@ -88,9 +80,6 @@ func TestTildeRootHome(t *testing.T) {
 }
 
 func TestTildeNoHome(t *testing.T) {
-	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-
 	t.Setenv("HOME", "")
 
 	in := "/home/dev/x.go"

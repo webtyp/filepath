@@ -3,7 +3,6 @@
 package filepath_test
 
 import (
-	"os"
 	"testing"
 	"webtyp.com/filepath"
 )
@@ -11,17 +10,7 @@ import (
 func TestShortCwd(t *testing.T) {
 	dir := t.TempDir()
 
-	// change working dir to temp dir
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(wd)
-
-	err = os.Chdir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(dir)
 
 	path := filepath.Join(dir, "a.go")
 	got := filepath.Short(path)
