@@ -15,8 +15,10 @@ This package provides path manipulation helpers (`Join`, `Base`, `Ext`) and disp
 | Shorten absolute paths relative to CWD | `filepath.Short(text)` |
 | Shorten paths relative to a custom base | `filepath.RelativeTo(text, base)` |
 | Replace home directory with `~` | `filepath.Tilde(text)` |
+| Compact multiple paths sharing a common parent | `filepath.CompactList(paths)` |
 
 ### Examples
+
 
 #### `Join`
 ```go
@@ -57,7 +59,18 @@ filepath.Tilde("open /home/dev/a.go and /home/dev/b.go")
 // -> "open ~/a.go and ~/b.go"
 ```
 
+#### `CompactList`
+Renders a slice of paths as one compact string: common directory prefix once (with `~` when under home) and differing items in braces.
+```go
+filepath.CompactList([]string{
+	"/home/cesar/Dev/Project/webtyp/form",
+	"/home/cesar/Dev/Project/webtyp/model",
+})
+// -> "~/Dev/Project/webtyp/{form, model}"
+```
+
 ---
+
 
 ## Migrating from webtyp.com/fmt
 
